@@ -1,7 +1,6 @@
 # HW15: Технология контейнеризации. Введение в Docker.
 
 ## Подготовка репозитория:
-```
 git chechout -b docker-2
 Добавим хук pre-commit (проверяет, нет ли лишних пробелов в наших файлах и есть ли в конце файла пустая строка)
 	1. Установить pip (curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py & python get-pip.py)
