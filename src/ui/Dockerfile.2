@@ -1,39 +1,26 @@
-FROM alpine:latest
+FROM andrius/alpine-ruby
 
 LABEL maintainer="Ruslan Yagudin <r@zoloto585.ru>"
-
-RUN apk update \
-&& apk add ruby \
-           ruby-etc \
-           ruby-bigdecimal \
-           ruby-io-console \
-           ruby-irb \
-           ca-certificates \
-           libressl \
-           less \
-&& apk add --virtual .build-dependencies \
-           build-base \
-           ruby-dev \
-           libressl-dev
-
-RUN gem install bundler || apk add ruby-bundler \
-&& bundle config build.nokogiri --use-system-libraries \
-&& bundle config git.allow_insecure true \
-&& gem install json \
-\
-&& gem cleanup \
-&& apk del .build-dependencies \
-&& rm -rf /usr/lib/ruby/gems/*/cache/* \
-          /var/cache/apk/* \
-          /tmp/* \
-          /var/tmp/*
 
 ENV APP_HOME /app
 RUN mkdir $APP_HOME
 
 WORKDIR $APP_HOME
 ADD Gemfile* $APP_HOME/
-#RUN bundle install
+
+RUN apk add --no-cache --virtual .build-deps build-base \
+    ruby \
+    ruby-dev \
+    ruby-bundler \
+    ruby-json \
+    ruby-irb \
+    ruby-rake \
+    ruby-bigdecimal \
+    && gem install bundler -v "1.17.2" \
+    && bundle install \
+    && apk del .build-deps
+
+
 ADD . $APP_HOME
 
 ENV POST_SERVICE_HOST post
