@@ -1,145 +1,148 @@
-# HW16: Docker-образы. Микросервисы
-```
-git checkout -b docker-3
-```
-## Прикрутил Dockerfile Linter
-https://github.com/hadolint/hadolint
-https://hadolint.github.io/hadolint/
-```
-export GOOGLE_PROJECT=otus-docker
-```
-```
-docker-machine create --driver google \
- --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
- --google-machine-type n1-standard-1 \
- --google-zone europe-west1-b \
- docker-host
-```
-Переключаю докер-машин на данное окружение:
-```
-eval $(docker-machine env docker-host)
-```
-Проверяю, докер хост создан:
-```
-docker-machine ls
-NAME          ACTIVE   DRIVER   STATE     URL                         SWARM   DOCKER     ERRORS
-docker-host   *        google   Running   tcp://104.155.127.31:2376           v19.03.4
+# HW17: Docker: сети, docker-compose
+
+### Cоздаем контейнеры из доступных сетевых интерфейсов только loopback
 
 ```
-## Скачал, распаковал и переименовал репозиторий в src
-
-В файлах Dockerfile содержатся инструкции по созданию образа. С них, набранных заглавными буквами, начинаются строки этого файла. После инструкций идут их аргументы. Инструкции, при сборке образа, обрабатываются сверху вниз.
-Слои в итоговом образе создают только инструкции FROM, RUN, COPY, и ADD.
-
-- FROM — задаёт базовый (родительский) образ.
-
-- LABEL — описывает метаданные. Например — сведения о том, кто создал и поддерживает образ.
-
-- ENV — устанавливает постоянные переменные среды.
-
-- RUN — выполняет команду и создаёт слой образа. Используется для установки в контейнер пакетов.
-
-- COPY — копирует в контейнер файлы и папки.
-
-- ADD — копирует файлы и папки в контейнер, может распаковывать локальные .tar-файлы, можно использовать для curl.
-
-- CMD — описывает команду с аргументами, которую нужно выполнить когда контейнер будет запущен. Аргументы могут быть переопределены при запуске контейнера. В файле может присутствовать лишь одна инструкция CMD.
-
-- WORKDIR — задаёт рабочую директорию для следующей инструкции.
-
-- ARG — задаёт переменные для передачи Docker во время сборки образа.
-
-- ENTRYPOINT — предоставляет команду с аргументами для вызова во время выполнения контейнера. Аргументы не переопределяются.
-
-- EXPOSE — указывает на необходимость открыть порт.
-
-- VOLUME — создаёт точку монтирования для работы с постоянным хранилищем.
-
-Компоненты приложения:
-- post-py - сервис отвечающий за написание постов:
-- Comment - сервис отвечающий за написание комментариев
-- UI - веб-интерфейс, работающий с другими сервисами
-- База данных MongoDB
-
-
-## Задание со *:
-
-Запустите контейнеры с другими сетевыми алиасами:
-При запуске контейнеров (docker run) задайте им
-переменные окружения соответствующие новым сетевым
-алиасам, не пересоздавая образ:
+docker run -ti --rm --network none joffotron/docker-net-tools -c ifconfig
+docker run -d --network none joffotron/docker-net-tools -c 'ping localhost'
 ```
-docker run -d --network=reddit --network-alias=post_db123 --network-alias=comment_db123 mongo:latest
-
-docker run -d --network=reddit --network-alias=post123 \
--e "POST_DATABASE_HOST=post_db123" \
-rusachello/post:1.0
-
-docker run -d --network=reddit --network-alias=comment123 \
--e "COMMENT_DATABASE_HOST=comment_db123" \
-rusachello/comment:1.0
-
-docker run -d --network=reddit -p 9292:9292 \
--e "POST_SERVICE_HOST=post123" \
--e "COMMENT_SERVICE_HOST=comment123" \
-rusachello/ui:1.0
-```
-Проверьте работоспособность сервиса:
-http://<docker-host-ip>:9292/
-Работает!
-
-### Задание со *:
-
-Попробуйте собрать образ на основе Alpine Linux. Придумайте еще способы уменьшить размер образа
-Можете реализовать как только для UI сервиса, так и для остальных (post, comment)
-Все оптимизации проводите в Dockerfile сервиса.
-Дополнительные варианты решения уменьшения размера образов можете оформить в виде файла Dockerfile.<цифра> в папке сервиса
-
-Пробовал использовать разные base image'и для сборки образов, но получилось прикрутить только к 2.2-alpine и alpine3.10 (в прод пошла alpine3.10, соответсвенно rusachello/ui:3.0 - для ui, rusachello/comment:2.0 - для comment, rusachello/post:1.0 - для post)
+### Запустим контейнер в сетевом пространстве docker-хоста
 
 ```
-ruby                  slim                149MB
-rusachello/ui         1.0                 149MB
+docker run -ti --rm --network host joffotron/docker-net-tools -c ifconfig
+docker run --network host -d nginx
+```
+### На docker-host машине выполните команду
 
-ruby                  2.2-alpine          107MB
-rusachello/ui         2.0                 160MB
+```
+docker-machine ssh docker-host 'sudo ln -s /var/run/docker/netns /var/run/netns'
+```
+### Просматривать на docker-host существующие в данный момент net-namespaces
 
-ruby                  alpine3.10          52.9MB
-rusachello/ui         3.0                 103MB
+```
+docker-machine ssh docker-host 'sudo ip netns'
+```
+### ip netns exec <namespace> <command> - позволит выполнять команды в выбранном namespace
 
-andrius/alpine-ruby   latest              26.6MB
-rusachello/ui         4.0                 26.7MB
+```
+docker-machine ssh docker-host 'sudo ip netns exec c9e839714221 ifconfig'
+```
+### Создадим bridge-сеть в docker (флаг --driver указывать необязательно, т.к. по-умолчанию используется bridge)
+
+```
+docker network create reddit --driver bridge
+```
+### Создадим docker-сети
+
+```
+docker network create back_net --subnet=10.0.2.0/24
+docker network create front_net --subnet=10.0.1.0/24
+```
+### Запустим контейнеры
+
+```
+docker run -d --network=front_net -p 9292:9292 --name ui rusachello/ui:3.0
+docker run -d --network=back_net --name comment rusachello/comment:2.0
+docker run -d --network=back_net --name post rusachello/post:1.0
+docker run -d --network=back_net --name mongo_db --network-alias=post_db --network-alias=comment_db mongo:latest
+```
+### Дополнительные сети подключаются командой
+
+```
+docker network connect <network> <container>
+```
+### Просмотр veth-интерфейсов на бриджовом интерфейсе
+
+```
+brctl show br-20f5e0dc25aa
 ```
 
-## Финальная проверка на чистой машине:
-- Готовим имаджи
+
+## Установка docker-compose (2 способа)
+
 ```
-docker build -f=Dockerfile-prod -t rusachello/ui:3.0 ./
-docker build -f=Dockerfile-prod -t rusachello/comment:2.0 ./
-docker build -f=Dockerfile-prod -t rusachello/post:1.0 ./
+https://docs.docker.com/compose/install/#install-compose
+pip install docker-compose
 ```
 
-- Создаем сеть и volume
+### Запуск контейнеров
+
 ```
-docker network create reddit
-docker volume create reddit_db
+export USERNAME=<your-login>
+docker-compose up -d
+docker-compose ps
 ```
 
-- Запускаем контейнеры
+### Запись переменных в файл .env
+
 ```
-docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db -v reddit_db:/data/db mongo:latest
-docker run -d --network=reddit --network-alias=post rusachello/post:1.0
-docker run -d --network=reddit --network-alias=comment rusachello/comment:2.0
-docker run -d --network=reddit -p 9292:9292 rusachello/ui:3.0
+${USERNAME} ${COMMENT_VERSION} ${POST_VERSION} ${UI_VERSION} ${MONGO_VERSION} ${UI_PORT} ${COMPOSE_PROJECT_NAME}
 ```
 
-ЕСЛИ вдруг играл на своей машине, то:
+## Задание 2
+Базовое имя проекта, берется из имени директории в которой запускается docker-compose. Его можно задать прописав в ENV файл переменную COMPOSE_PROJECT_NAME=<name> или передать через консоль при запуске docker-compose с ключом -p <name>.
+
+COMPOSE_PROJECT_NAME=dockermicroservices
+
+## Задание со *
+Docker Compose по умолчанию читает два файла: docker-compose.yml и docker-compose.override.yml. В файле docker-compose-override.yml можно хранить переопределения для существующих сервисов или определять новые. Чтобы использовать несколько файлов (или файл переопределения с другим именем), необходимо передать -f в docker-compose up (порядок имеет значение):
+$ docker-compose up -f my-override-1.yml my-overide-2.yml
+
+Для того, что бы можно было изменять код приложений и не выполнять сборку образа будем использовать volume и прокинем в контейнер каталог с приложением. Для запуска puma в дебаг режиме с двумя воркерами воспользуемся entrypoint.
+
+Напишем docker-compose.override.yml
 ```
-docker kill $(docker ps -q)
-docker stop $(docker ps -a -q)
-docker rm $(docker ps -a -q)
-# волиумы посмотрим:
-docker volume ls
-# тож можно поубивать
-docker volume rm $(docker volume ls -f dangling=true -q)
+version: '3.3'
+services:
+  ui:
+    volumes:
+      - ui:/app
+    entrypoint:
+      - puma
+      - --debug
+      - -w 2
+  post:
+    volumes:
+      - post-py:/app
+  comment:
+    volumes:
+      - comment:/app
+    entrypoint:
+      - puma
+      - --debug
+      - -w 2
+
+volumes:
+  ui:
+  post-py:
+  comment:
+```
+Запустим docker-compose и проверим результат
+```
+~/otus_microservices/src(docker-4*) » docker-compose up -d
+~/otus_microservices/src(docker-4*) » docker-compose ps
+            Name                          Command             State           Ports
+--------------------------------------------------------------------------------------------
+dockermicroservices_comment_1   puma --debug -w 2             Up
+dockermicroservices_post_1      python3 post_app.py           Up
+dockermicroservices_post_db_1   docker-entrypoint.sh mongod   Up      27017/tcp
+dockermicroservices_ui_1        puma --debug -w 2             Up      0.0.0.0:9292->9292/tcp
+```
+Подключимся к контейнеру и посмотрим
+```
+~/otus_microservices/src(docker-4*) » docker ps -a
+CONTAINER ID        IMAGE                    COMMAND                  CREATED             STATUS              PORTS                    NAMES
+ad424c97177e        mongo:3.2                "docker-entrypoint.s…"   2 minutes ago       Up 2 minutes        27017/tcp                dockermicroservices_post_db_1
+211954177d91        rusachello/ui:1.0        "puma --debug '-w 2'"    2 minutes ago       Up 2 minutes        0.0.0.0:9292->9292/tcp   dockermicroservices_ui_1
+872b94d0d05a        rusachello/post:1.0      "python3 post_app.py"    2 minutes ago       Up 2 minutes                                 dockermicroservices_post_1
+b45ed4c38618        rusachello/comment:1.0   "puma --debug '-w 2'"    2 minutes ago       Up 2 minutes                                 dockermicroservices_comment_1
+
+~/otus_microservices/src(docker-4*) » docker exec -it 211954177d91 /bin/sh
+/app # ps aux
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.1  0.6  83884 23020 ?        Ss   12:50   0:00 puma 3.12.0 (tcp://0.0.0.0:9292) [app]
+root         6  0.3  1.4 139360 56060 ?        Sl   12:50   0:01 puma: cluster worker 0: 1 [app]
+root         7  0.3  1.4 139040 56028 ?        Sl   12:50   0:01 puma: cluster worker 1: 1 [app]
+root       222  2.6  0.0   1628     4 pts/0    Ss   12:58   0:00 /bin/sh
+root       231  0.0  0.0   1616   464 pts/0    R+   12:59   0:00 ps aux
 ```
