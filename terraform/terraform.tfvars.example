@@ -1,0 +1,4 @@
+project          = "my_project_id"
+public_key_path  = "~/.ssh/id_rsa.pub"
+disk_image       = "reddit-full"
+private_key_path = "~/.ssh/id_rsa"

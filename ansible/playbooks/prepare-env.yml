@@ -1,0 +1,18 @@
+- hosts: all
+  become: true
+  tasks:
+
+  - name: Create directories
+    file:
+      path: "{{ item }}"
+      state: directory
+      recurse: yes
+    with_items:
+      - '/srv/gitlab/config'
+      - '/srv/gitlab/data'
+      - '/srv/gitlab/logs'
+
+  - name: Сreate file docker-compose.yml
+    copy:
+      src: '~/otus_microservices/ansible/files/docker-compose.yml'
+      dest: '/srv/gitlab/docker-compose.yml'
