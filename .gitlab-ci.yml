@@ -1,9 +1,11 @@
-image: ruby:2.4.2
+#image: ruby:2.4.2
 
 stages:
   - build
   - test
   - review
+  - stage
+  - production
 
 build_job:
   stage: build
@@ -37,3 +39,21 @@ deploy_dev_job:
   environment:
     name: dev
     url: http://dev.example.com
+
+staging:
+  stage: stage
+  when: manual
+  script:
+    - echo 'Deploy'
+  environment:
+    name: stage
+    url: https://beta.example.com
+
+production:
+  stage: production
+  when: manual
+  script:
+    - echo 'Deploy'
+  environment:
+    name: production
+    url: https://example.com
