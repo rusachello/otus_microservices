@@ -1,113 +1,52 @@
-# HW19: Устройство Gitlab CI. Построение процесса непрерывной поставки
+# HW20: Введение в мониторинг. Системы мониторинга.
 
-- Подготовить инсталляцию Gitlab CI
-- Подготовить репозиторий с кодом приложения
-- Описать для приложения этапы пайплайна
-- Определить окружения
+- Prometheus: запуск, конфигурация, знакомство с Web UI
+- Мониторинг состояния микросервисов
+- Сбор метрик хоста с использованием экспортера
+- Задания со *
 
-1. Cоздаем вм в Google Cloud с помощью terraform и разрешаем подключение по HTTP/HTTPS
-2. Установка docker engine с помощью ansible-playbook (playbooks/docker-install.yml)
-
+1. Создадим правило фаервола для Prometheus и Puma:
 ```
-- hosts: all
-  become: true
-  tasks:
-  - name: Add Docker GPG key
-    apt_key: url=https://download.docker.com/linux/ubuntu/gpg
-
-  - name: Add Docker APT repository
-    apt_repository:
-      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ansible_distribution_release}} stable
-
-  - name: Install list of packages
-    apt:
-      name: ['apt-transport-https','ca-certificates','curl','software-properties-common','docker-ce']
-      state: present
-      update_cache: yes
-```
-```
-ansible-playbook ./playbooks/docker-install.yml
+gcloud compute firewall-rules create prometheus-default --allow tcp:9090
+gcloud compute firewall-rules create puma-default --allow tcp:9292
 ```
 
-3. Подготовка окружения на новом сервере через ansible-playbook (playbooks/prepare-env.yml)
-
+2. Создадим Docker хост в GCE и настроим локальное окружение на работу с ним
 ```
-- hosts: all
-  become: true
-  tasks:
+docker-machine create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-zone europe-west1-b \
+    docker-host
 
-  - name: Create directories
-    file:
-      path: "{{ item }}"
-      state: directory
-      recurse: yes
-    with_items:
-      - '/srv/gitlab/config'
-      - '/srv/gitlab/data'
-      - '/srv/gitlab/logs'
-
-  - name: Сreate file docker-compose.yml
-    copy:
-      src: '~/otus_microservices/gitlab-ci/docker-compose.yml'
-      dest: '/srv/gitlab/docker-compose.yml'
+# configure local env
+eval $(docker-machine env docker-host)
 ```
 
-4. Запускаем Gitlab CI
-
+3. Prometheus будем запускать внутри Docker контейнера. Для начального знакомства воспользуемся готовым образом с DockerHub.
 ```
-docker-compose up -d (/srv/gitlab)
-```
-
-5. Создадим группу
-6. Создадим проект
-7. Добавляем remote в ```<username>_microservices```
-
-```
-git checkout -b gitlab-ci-1
-git remote add gitlab http://<your-vm-ip>/homework/example.git
-git push gitlab gitlab-ci-1
+$ docker run --rm -p 9090:9090 -d --name prometheus  prom/prometheus
 ```
 
-8. Определение CI/CD Pipeline для проекта. (добавить файл .gitlab-ci.yml в репозиторий)
-
+4. IP адрес созданной VM можно узнать, используя команду:
 ```
-stages:
-  - build
-  - test
-  - deploy
-
-build_job:
-  stage: build
-  script:
-    - echo 'Building'
-
-test_unit_job:
-  stage: test
-  script:
-    - echo 'Testing 1'
-
-test_integration_job:
-  stage: test
-  script:
-    - echo 'Testing 2'
-
-deploy_job:
-  stage: deploy
-  script:
-    - echo 'Deploy'
+docker-machine ip docker-host
 ```
 
-9. На сервере, где работает Gitlab CI запускаем runner
-
+5. В директории prometheus собираем Docker образ:
 ```
-docker run -d --name gitlab-runner --restart always \
--v /srv/gitlab-runner/config:/etc/gitlab-runner \
--v /var/run/docker.sock:/var/run/docker.sock \
-gitlab/gitlab-runner:latest
+$ export USER_NAME=username
+$ docker build -t $USER_NAME/prometheus .
 ```
+Где USER_NAME - ВАШ логин от DockerHub.
 
-10. Регистируем Runner
-
+6. Выполните сборку образов при помощи скриптов docker_build.sh в директории каждого сервиса.
 ```
-docker exec -it gitlab-runner gitlab-runner register --run-untagged --locked=false
+/src/ui $ bash docker_build.sh
+/src/post-py $ bash docker_build.sh
+/src/comment $ bash docker_build.sh
+```
+Или сразу все из корня репозитория:
+```
+for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done
 ```
