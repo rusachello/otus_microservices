@@ -1,4 +1,4 @@
-FROM ruby:alpine3.10
+FROM ubuntu:16.04
 
 ENV APP_HOME /app
 RUN mkdir $APP_HOME
@@ -6,10 +6,10 @@ RUN mkdir $APP_HOME
 WORKDIR $APP_HOME
 COPY Gemfile* $APP_HOME/
 
-RUN apk add --no-cache --virtual .build-deps build-base \
-    && gem install bundler -v "1.17.2" \
-    && bundle install \
-    && apk del .build-deps
+RUN apt-get update \
+    && apt-get install -y ruby-full ruby-dev build-essential \
+    && gem install bundler --no-ri --no-rdoc \
+    && bundle install
 
 COPY . $APP_HOME
 

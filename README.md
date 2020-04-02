@@ -1,64 +1,47 @@
-# HW21: Введение в мониторинг. Системы мониторинга.
+# HW23: Введение в мониторинг. Системы мониторинга.
 
-- Мониторинг Docker контейнеров
-- Визуализация метрик
-- Сбор метрик работы приложения и бизнес метрик
-- Настройка и проверка алертинга
-- Много заданий со ⭐ (необязательных)
+- Сбор неструктурированных логов
+- Визуализация логов
+- Сбор структурированных логов
+- Распределенная трасировка
 
-1. В процессе задания будет создано несколько правил FW для разных сервисов:
+1. Создадим Docker хост в GCE и настроим локальное окружение на работу с ним
 ```
-gcloud compute firewall-rules create prometheus-default --allow tcp:9090
-gcloud compute firewall-rules create puma-default --allow tcp:9292
-gcloud compute firewall-rules create cadvisor-default --allow tcp:8080
-gcloud compute firewall-rules create grafana-default --allow tcp:3000
-gcloud compute firewall-rules create alertmanager-default --allow tcp:9093
-```
+export GOOGLE_PROJECT=otus-docker
 
-2. Создадим Docker хост в GCE и настроим локальное окружение на работу с ним
-```
 docker-machine create --driver google \
     --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
     --google-machine-type n1-standard-1 \
-    --google-zone europe-west1-b \
-    docker-host
+    --google-open-port 5601/tcp \
+    --google-open-port 9292/tcp \
+    --google-open-port 9411/tcp \
+    logging
 
-# Настроить докер клиент на удаленный докер демон
-eval $(docker-machine env docker-host)
 
-# Переключение на локальный докер
-eval $(docker-machine env --unset)
+$ eval $(docker-machine env logging)
+
+# узнаем IP адрес
+$ docker-machine ip logging
 ```
 
-3. Для запуска приложений будем как и ранее использовать
+2. Собрать docker image для fluentd из директории logging/fluentd
+```
+docker build -t $USER_NAME/fluentd .
+```
+
+3. Правим .env файл и меняем теги нашего приложения на logging, затем запустим сервисы приложения
 ```
 docker-compose up -d
 ```
 
-4. Для запуска мониторинга
+4. Команда для просмотра логов post сервиса:
 ```
-docker-compose -f docker-compose-monitoring.yml up -d
-```
-
-5. Добавим информацию о новом сервисе cAdvisor в конфигурацию Prometheus и пересоберем образ Prometheus с обновленной конфигурацией:
-```
-export USER_NAME=username # где username - ваш логин на Docker Hub
-docker build -t $USER_NAME/prometheus .
+docker-compose logs -f post
 ```
 
-6. Запустим сервисы
+5. Поднимем инфраструктуру централизованной системы логирования и перезапустим сервисы приложения из каталога docker
 ```
+docker-compose -f docker-compose-logging.yml up -d
+docker-compose down
 docker-compose up -d
-docker-compose -f docker-compose-monitoring.yml up -d
-```
-
-7. Проверка сервисов
-```
-docker-compose ps
-docker-compose -f docker-compose-monitoring.yml ps
-```
-
-8. Запустим сервис gragfana (при добавлнении в файл конфигигурации нового сервиса под названием grafana)
-```
-docker-compose -f docker-compose-monitoring.yml up -d grafana
 ```
