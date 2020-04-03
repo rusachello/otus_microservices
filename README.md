@@ -17,7 +17,6 @@ docker-machine create --driver google \
     --google-open-port 9411/tcp \
     logging
 
-
 $ eval $(docker-machine env logging)
 
 # узнаем IP адрес
