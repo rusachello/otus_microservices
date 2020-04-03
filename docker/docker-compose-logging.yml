@@ -1,0 +1,69 @@
+version: '3.3'
+services:
+  fluentd:
+    image: ${USERNAME}/fluentd
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    networks:
+      back_net:
+        aliases:
+          - fluentd
+      front_net:
+        aliases:
+          - fluentd
+
+  elasticsearch:
+    image: elasticsearch:7.4.0
+    environment:
+      - ELASTIC_CLUSTER=false
+      - CLUSTER_NODE_MASTER=true
+      - CLUSTER_MASTER_NODE_NAME=es01
+      - discovery.type=single-node
+    expose:
+      - 9200
+    ports:
+      - "9200:9200"
+    networks:
+      back_net:
+        aliases:
+          - elasticsearch
+      front_net:
+        aliases:
+          - elasticsearch
+
+  kibana:
+    image: kibana:7.4.0
+    ports:
+      - "5601:5601"
+    networks:
+      back_net:
+        aliases:
+          - kibana
+      front_net:
+        aliases:
+          - kibana
+
+  zipkin:
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      back_net:
+        aliases:
+          - zipkin
+      front_net:
+        aliases:
+          - zipkin
+
+
+networks:
+  back_net:
+    ipam:
+      config:
+        - subnet: 10.0.2.0/24
+
+  front_net:
+    ipam:
+      config:
+        - subnet: 10.0.1.0/24
