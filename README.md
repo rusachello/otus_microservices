@@ -1,26 +1,41 @@
-# HW25: Введение в Kubernetes.
+# HW26: Kubernetes. Запуск кластера и приложения. Модель безопасности.
 
-- Разобрать на практике все компоненты Kubernetes, развернуть их вручную используя The Hard Way;
-- Ознакомиться с описанием основных примитивов нашего приложения и его дальнейшим запуском в Kubernetes.
+- Развернуть локальное окружение для работы сKubernetes;
+- Развернуть Kubernetes в GKE;
+- Запустить reddit в Kubernetes.
 
-1. Подробный официальный гайд по Kubernetes THW
+1. Все способы установки kubectl:
+
 ```
-https://github.com/kelseyhightower/kubernetes-the-hard-way/
+https://kubernetes.io/docs/tasks/tools/install-kubectl/
 ```
 
-2. Полезные команды из руководства:
+2. Инструкция по установке Minikube для разных ОС:
 ```
-for i in 0 1 2; do
-  gcloud compute instances create controller-${i} \
-    --async \
-    --boot-disk-size 200GB \
-    --can-ip-forward \
-    --image-family ubuntu-1804-lts \
-    --image-project ubuntu-os-cloud \
-    --machine-type n1-standard-1 \
-    --private-network-ip 10.240.0.1${i} \
-    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
-    --subnet kubernetes \
-    --tags kubernetes-the-hard-way,controller
-done
+https://kubernetes.io/docs/tasks/tools/install-minikube/
+```
+
+3. Запустим наш Minukube-кластер
+```
+minikube start
+```
+
+4. Запустим наш Minukube-кластер c заданными параметрами конфигурации
+```
+minikube start --cpus=4 --memory 4096 --disk-size='10000mb'
+```
+
+5. Выдать web-странцы с сервисами которые были помечены типом NodePort
+```
+minikube service ui
+```
+
+6. Список сервисов в minikube
+```
+minikube service list
+```
+
+7. Получить список расширений minikube
+```
+minikube addons list
 ```

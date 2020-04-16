@@ -6,3 +6,5 @@
 
 # Docker-compose's files
 .env
+
+minikube
